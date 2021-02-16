@@ -51,22 +51,32 @@ RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/lib
     && ldconfig
 
 FROM nvidia as python
+
+# Python
+# ------
+
 # See http://bugs.python.org/issue19846
 ENV LANG C.UTF-8
 
+ARG PYTHON_VERSION=3.8
+ARG PYTHON_MAJOR_VERSION=3
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update && apt-get install -y \
-    python3.8 \
-    python3-pip
+    python${PYTHON_VERSION} \
+    python${PYTHON_MAJOR_VERSION}-pip
 
-RUN python3.8 -m pip --no-cache-dir install --upgrade \
+RUN python${PYTHON_VERSION} -m pip --no-cache-dir install --upgrade \
     "pip<21.0.1" \
     setuptools
 
 # Some TF tools expect a "python" binary
-RUN ln -s $(which python3.8) /usr/local/bin/python
+RUN ln -s $(which python${PYTHON_VERSION}) /usr/local/bin/python
 
 FROM python as base
+
+# TensorFlow
+# ----------
+
 # Options:
 #   tensorflow
 #   tensorflow-gpu
@@ -76,23 +86,29 @@ FROM python as base
 # Installs the latest version by default.
 ARG TF_PACKAGE=tensorflow-gpu
 ARG TF_PACKAGE_VERSION=2.4.1
-RUN python3.8 -m pip install --no-cache-dir ${TF_PACKAGE}${TF_PACKAGE_VERSION:+==${TF_PACKAGE_VERSION}}
+RUN python${PYTHON_VERSION} -m pip install --no-cache-dir ${TF_PACKAGE}${TF_PACKAGE_VERSION:+==${TF_PACKAGE_VERSION}}
+
+# Torch
+# -----
 
 ARG TORCH_PACKAGE_VERSION=1.7.1+cu110
-RUN python3.8 -m pip install --no-cache-dir \
+RUN python${PYTHON_VERSION} -m pip install --no-cache-dir \
     torch${TORCH_PACKAGE_VERSION:+==${TORCH_PACKAGE_VERSION}} \
     torchvision==0.8.2+cu110 \
     torchaudio==0.7.2 -f https://download.pytorch.org/whl/torch_stable.html
 
+# JAX
+# ---
+
 FROM base as jupyter
-RUN python3.8 -m pip install --no-cache-dir jupyter matplotlib
+RUN python${PYTHON_VERSION} -m pip install --no-cache-dir jupyter matplotlib
 # Pin ipykernel and nbformat; see https://github.com/ipython/ipykernel/issues/422
-RUN python3.8 -m pip install --no-cache-dir jupyter_http_over_ws ipykernel==5.1.1 nbformat==4.4.0
+RUN python${PYTHON_VERSION} -m pip install --no-cache-dir jupyter_http_over_ws ipykernel==5.1.1 nbformat==4.4.0
 RUN jupyter serverextension enable --py jupyter_http_over_ws
 
 EXPOSE 8888
 
-RUN python3.8 -m ipykernel.kernelspec
+RUN python${PYTHON_VERSION} -m ipykernel.kernelspec
 
 CMD ["bash", "-c", "source /etc/bash.bashrc && jupyter notebook --ip 0.0.0.0 --no-browser --allow-root"]
 
