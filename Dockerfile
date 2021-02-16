@@ -1,8 +1,8 @@
 ARG UBUNTU_VERSION=18.04
-
 ARG ARCH=
 ARG CUDA=11.0
-FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}-base-ubuntu${UBUNTU_VERSION} as base
+
+FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}-base-ubuntu${UBUNTU_VERSION} as nvidia
 # ARCH and CUDA are specified again because the FROM directive resets ARGs
 # (but their default value is retained if set previously)
 ARG ARCH
@@ -50,9 +50,9 @@ RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/lib
     && echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/z-cuda-stubs.conf \
     && ldconfig
 
+FROM nvidia as python
 # See http://bugs.python.org/issue19846
 ENV LANG C.UTF-8
-
 
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update && apt-get install -y \
@@ -60,12 +60,13 @@ RUN apt-get update && apt-get install -y \
     python3-pip
 
 RUN python3.8 -m pip --no-cache-dir install --upgrade \
-    "pip<20.3" \
+    "pip<21.0.1" \
     setuptools
 
 # Some TF tools expect a "python" binary
 RUN ln -s $(which python3.8) /usr/local/bin/python
 
+FROM python as base
 # Options:
 #   tensorflow
 #   tensorflow-gpu
@@ -74,9 +75,16 @@ RUN ln -s $(which python3.8) /usr/local/bin/python
 # Set --build-arg TF_PACKAGE_VERSION=1.11.0rc0 to install a specific version.
 # Installs the latest version by default.
 ARG TF_PACKAGE=tensorflow-gpu
-ARG TF_PACKAGE_VERSION=
+ARG TF_PACKAGE_VERSION=2.4.1
 RUN python3.8 -m pip install --no-cache-dir ${TF_PACKAGE}${TF_PACKAGE_VERSION:+==${TF_PACKAGE_VERSION}}
 
+ARG TORCH_PACKAGE_VERSION=1.7.1+cu110
+RUN python3.8 -m pip install --no-cache-dir \
+    torch${TORCH_PACKAGE_VERSION:+==${TORCH_PACKAGE_VERSION}} \
+    torchvision==0.8.2+cu110 \
+    torchaudio==0.7.2 -f https://download.pytorch.org/whl/torch_stable.html
+
+FROM base as jupyter
 RUN python3.8 -m pip install --no-cache-dir jupyter matplotlib
 # Pin ipykernel and nbformat; see https://github.com/ipython/ipykernel/issues/422
 RUN python3.8 -m pip install --no-cache-dir jupyter_http_over_ws ipykernel==5.1.1 nbformat==4.4.0
@@ -87,3 +95,14 @@ EXPOSE 8888
 RUN python3.8 -m ipykernel.kernelspec
 
 CMD ["bash", "-c", "source /etc/bash.bashrc && jupyter notebook --ip 0.0.0.0 --no-browser --allow-root"]
+
+FROM jupyter as new
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        dvipng \
+        poppler-utils \
+        imagemagick \
+        ffmpeg \
+        graphviz \
+        && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* ~/.cache/matplotlib
