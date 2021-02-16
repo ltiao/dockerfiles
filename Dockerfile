@@ -90,7 +90,6 @@ RUN python${PYTHON_VERSION} -m pip install --no-cache-dir ${TF_PACKAGE}${TF_PACK
 
 # Torch
 # -----
-
 ARG TORCH_PACKAGE_VERSION=1.7.1+cu110
 RUN python${PYTHON_VERSION} -m pip install --no-cache-dir \
     torch${TORCH_PACKAGE_VERSION:+==${TORCH_PACKAGE_VERSION}} \
@@ -99,6 +98,11 @@ RUN python${PYTHON_VERSION} -m pip install --no-cache-dir \
 
 # JAX
 # ---
+ARG JAX_PACKAGE_VERSION=0.2.9
+ARG JAXLIB_PACKAGE_VERSION=0.1.61+cuda110
+RUN python${PYTHON_VERSION} -m pip install --no-cache-dir \
+    jax${JAX_PACKAGE_VERSION:+==${JAX_PACKAGE_VERSION}} \
+    jaxlib${JAXLIB_PACKAGE_VERSION:+==${JAXLIB_PACKAGE_VERSION}} -f https://storage.googleapis.com/jax-releases/jax_releases.html
 
 FROM base as jupyter
 RUN python${PYTHON_VERSION} -m pip install --no-cache-dir jupyter matplotlib
