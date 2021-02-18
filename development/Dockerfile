@@ -72,7 +72,7 @@ RUN python${PYTHON_VERSION} -m pip --no-cache-dir install --upgrade \
 # Some TF tools expect a "python" binary
 RUN ln -s $(which python${PYTHON_VERSION}) /usr/local/bin/python
 
-FROM python as base
+FROM python as common
 
 # TensorFlow
 # ----------
@@ -104,25 +104,21 @@ RUN python${PYTHON_VERSION} -m pip install --no-cache-dir \
     jax${JAX_PACKAGE_VERSION:+==${JAX_PACKAGE_VERSION}} \
     jaxlib${JAXLIB_PACKAGE_VERSION:+==${JAXLIB_PACKAGE_VERSION}} -f https://storage.googleapis.com/jax-releases/jax_releases.html
 
+FROM common as base
+COPY requirements.txt ./
+RUN python -m pip install --no-cache-dir -r requirements.txt
+
 FROM base as jupyter
 RUN python${PYTHON_VERSION} -m pip install --no-cache-dir jupyter matplotlib
 # Pin ipykernel and nbformat; see https://github.com/ipython/ipykernel/issues/422
 RUN python${PYTHON_VERSION} -m pip install --no-cache-dir jupyter_http_over_ws ipykernel==5.1.1 nbformat==4.4.0
 RUN jupyter serverextension enable --py jupyter_http_over_ws
 
+RUN mkdir /.local && chmod a+rwx /.local
+RUN mkdir -p /usr/src/app
+WORKDIR /usr/src/app
 EXPOSE 8888
 
 RUN python${PYTHON_VERSION} -m ipykernel.kernelspec
 
 CMD ["bash", "-c", "source /etc/bash.bashrc && jupyter notebook --ip 0.0.0.0 --no-browser --allow-root"]
-
-FROM jupyter as new
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        dvipng \
-        poppler-utils \
-        imagemagick \
-        ffmpeg \
-        graphviz \
-        && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* ~/.cache/matplotlib
