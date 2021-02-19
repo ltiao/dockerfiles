@@ -70,7 +70,9 @@ RUN python${PYTHON_VERSION} -m pip --no-cache-dir install --upgrade \
     setuptools
 
 # Some TF tools expect a "python" binary
-RUN ln -s $(which python${PYTHON_VERSION}) /usr/local/bin/python
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1 && \
+    update-alternatives --set python3 /usr/bin/python${PYTHON_VERSION}
+RUN ln -s $(which python${PYTHON_MAJOR_VERSION}) /usr/local/bin/python
 
 FROM python as common
 
